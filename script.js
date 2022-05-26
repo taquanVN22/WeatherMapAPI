@@ -1,0 +1,124 @@
+const wrapper = document.querySelector(".wrapper"),
+inputPart = document.querySelector(".input-part"),
+infoTxt = inputPart.querySelector(".info-txt"),
+inputField = inputPart.querySelector("input"),
+locationBtn = inputPart.querySelector("button"),
+weatherPart = wrapper.querySelector(".weather-part"),
+wIcon = weatherPart.querySelector("img"),
+arrowBack = wrapper.querySelector("header i");
+
+let api;
+
+// add su kien
+inputField.addEventListener("keyup", e =>{
+    // nếu người dùng nhấn nút enter và input value is not empty
+    if(e.key == "Enter" && inputField.value != ""){
+        requestApi(inputField.value);//gọi fuction requestApi và truyền input value
+    }
+});
+
+locationBtn.addEventListener("click", () =>{
+    if(navigator.geolocation){ // nếu browser hỗ trợ geolocation api
+        navigator.geolocation.getCurrentPosition(onSuccess, onError);
+    }else{
+        alert("Your browser not support geolocation api");
+    }
+});
+
+function requestApi(city){
+    api = `https://api.openweathermap.org/data/2.5/weather?q=${city}&units=metric&appid=fcc585f794381902eb10d17f3dec53b7`;
+    fetchData();
+}
+
+function onSuccess(position){
+    const {latitude, longitude} = position.coords; // get coordinates của thiết bị người dùng từ coords object
+    api = `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&units=metric&appid=fcc585f794381902eb10d17f3dec53b7`;
+    fetchData();
+ 
+}
+function getMap(lat, lon){
+    map = new Microsoft.Maps.Map('.myMap', {
+        credentials: 'Your Bing Maps Key',
+        mapTypeId: Microsoft.Maps.MapTypeId.aerial,
+        center: new Microsoft.Maps.Location(lat, lon),
+        zoom: 10
+    });
+    infobox = new Microsoft.Maps.Infobox(map.getCenter(), {
+        visible: true
+    });
+    infobox.setMap(map);
+}
+
+function onError(error){
+    // nếu có bất kỳ lỗi nào xảy ra khi lấy location của người dùng thì thông báo lỗi trong infoText
+    infoTxt.innerText = error.message;
+    infoTxt.classList.add("error");
+}
+
+function fetchData(){
+    document.querySelector('.myMap').classList.add('active');
+    infoTxt.innerText = "Getting weather details...";
+    infoTxt.classList.add("pending");
+    // nhận api response và trả về dạng js obj
+    // sau đó gọi hàm weatherDetails  truyền kết quả api làm đối số
+    fetch(api)
+        .then(function(response){
+            return response.json();
+        })
+        .then(function(result){
+            return weatherDetails(result);
+        })
+        .catch(function(){
+        infoTxt.innerText = "Something went wrong";
+        infoTxt.classList.replace("pending", "error");
+    });
+}
+
+function weatherDetails(info){
+
+    if(info.cod == "404"){ // nếu người dùng nhập tên thành phố không hợp lệ
+        infoTxt.classList.replace("pending", "error");
+        infoTxt.innerText = `${inputField.value} isn't a valid city name`;
+    }else{
+        //nhận giá trị thuộc tính từ weather information
+        const city = info.name;
+        const country = info.sys.country;
+        const {description, id} = info.weather[0];
+        const {temp, feels_like, humidity} = info.main;
+        const {lat, lon} = info.coord;
+        getMap(lat, lon);
+
+        // sử dụng icon thời tiết tùy theo id mà api cung cấp cho chúng ta
+        if(id == 800){
+            wIcon.src = "icons/clear.svg";
+        }else if(id >= 200 && id <= 232){
+            wIcon.src = "icons/storm.svg";  
+        }else if(id >= 600 && id <= 622){
+            wIcon.src = "icons/snow.svg";
+        }else if(id >= 701 && id <= 781){
+            wIcon.src = "icons/haze.svg";
+        }else if(id >= 801 && id <= 804){
+            wIcon.src = "icons/cloud.svg";
+        }else if((id >= 500 && id <= 531) || (id >= 300 && id <= 321)){
+            wIcon.src = "icons/rain.svg";
+        }
+        
+        //dom css
+        weatherPart.querySelector(".temp .numb").innerText = Math.floor(temp);
+        weatherPart.querySelector(".weather").innerText = description;
+        weatherPart.querySelector(".location span").innerText = `${city}, ${country}`;
+        weatherPart.querySelector(".temp .numb-2").innerText = Math.floor(feels_like);
+        weatherPart.querySelector(".humidity span").innerText = `${humidity}%`;
+        document.body.style.backgroundImage = "url('https://source.unsplash.com/1600x900/?"+city+"')";
+        infoTxt.classList.remove("pending", "error");
+        infoTxt.innerText = "";
+        inputField.value = "";
+        wrapper.classList.add("active");
+        console.log(info);
+    }
+}
+
+arrowBack.addEventListener("click", ()=>{
+    wrapper.classList.remove("active");
+    document.querySelector('.myMap').classList.remove('active');
+});
